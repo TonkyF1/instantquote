@@ -289,3 +289,278 @@ export function emptyDocument(
     payment: extras.payment ? { ...emptyPayment(), ...extras.payment } : emptyPayment(),
   };
 }
+
+export function normalizeDocument(raw: unknown): QuoteDocument {
+  const doc = (raw ?? {}) as Partial<QuoteDocument>;
+  const base = emptyDocument();
+  const items = Array.isArray(doc.items) && doc.items.length > 0
+    ? doc.items.map((item, i) => ({
+        id: String(item?.id ?? `item-${i}`),
+        description: String(item?.description ?? ""),
+        qty: Number(item?.qty) || 0,
+        unitPrice: Number(item?.unitPrice) || 0,
+      }))
+    : base.items;
+  const look: LookId =
+    doc.look === "atelier" || doc.look === "ledger" ? doc.look : "classic";
+  const status: DocStatus =
+    doc.status === "sent" || doc.status === "paid" || doc.status === "overdue"
+      ? doc.status
+      : "draft";
+  return {
+    ...base,
+    ...doc,
+    id: String(doc.id ?? base.id),
+    type: doc.type === "invoice" ? "invoice" : "estimate",
+    number: String(doc.number ?? base.number),
+    date: String(doc.date ?? base.date),
+    dueDate: String(doc.dueDate ?? ""),
+    validUntil: String(doc.validUntil ?? ""),
+    poNumber: String(doc.poNumber ?? ""),
+    currency: isValidCurrency(String(doc.currency ?? ""))
+      ? String(doc.currency)
+      : DEFAULT_CURRENCY,
+    status,
+    look,
+    templateId: String(doc.templateId ?? ""),
+    business: { ...emptyBusiness(), ...(doc.business ?? {}) },
+    client: { ...emptyClient(), ...(doc.client ?? {}) },
+    items,
+    taxPercent: Number(doc.taxPercent) || 0,
+    discountType: doc.discountType === "percent" ? "percent" : "amount",
+    discountValue: Number(doc.discountValue) || 0,
+    depositAmount: Number(doc.depositAmount) || 0,
+    notes: String(doc.notes ?? base.notes),
+    accentColor: String(doc.accentColor ?? DEFAULT_ACCENT),
+    hideCreatedWith: Boolean(doc.hideCreatedWith),
+    payment: normalizePayment(doc.payment),
+    savedAt: doc.savedAt,
+  };
+}
+
+function normalizePayment(raw: unknown): PaymentMethods {
+  const p = (raw ?? {}) as Partial<PaymentMethods>;
+  const preset: PaymentPresetId =
+    p.preset === "bank" ||
+    p.preset === "paypal" ||
+    p.preset === "stripe" ||
+    p.preset === "cash"
+      ? p.preset
+      : "";
+  return {
+    ...emptyPayment(),
+    ...p,
+    preset,
+    sortCode: String(p.sortCode ?? ""),
+    accountNumber: String(p.accountNumber ?? ""),
+  };
+}
+
+export function computeTotals(doc: QuoteDocument): Totals {
+  const subtotal = roundMoney(
+    doc.items.reduce((sum, item) => {
+      const qty = Number(item.qty) || 0;
+      const price = Number(item.unitPrice) || 0;
+      return sum + qty * price;
+    }, 0),
+  );
+  const rawDiscount =
+    doc.discountType === "percent"
+      ? subtotal * ((Number(doc.discountValue) || 0) / 100)
+      : Number(doc.discountValue) || 0;
+  const discount = roundMoney(Math.min(Math.max(0, rawDiscount), subtotal));
+  const taxable = roundMoney(Math.max(0, subtotal - discount));
+  const tax = roundMoney(taxable * ((Number(doc.taxPercent) || 0) / 100));
+  const total = roundMoney(taxable + tax);
+  const deposit = roundMoney(
+    Math.min(Math.max(0, Number(doc.depositAmount) || 0), total),
+  );
+  const balance = roundMoney(Math.max(0, total - deposit));
+  return { subtotal, discount, tax, total, deposit, balance };
+}
+
+export function filledItems(doc: QuoteDocument): LineItem[] {
+  return doc.items.filter(
+    (item) => item.description.trim().length > 0 || Number(item.unitPrice) > 0,
+  );
+}
+
+export function canExport(doc: QuoteDocument): { ok: true } | { ok: false; message: string } {
+  if (!doc.business.name.trim()) {
+    return {
+      ok: false,
+      message: "Add your business name before printing.",
+    };
+  }
+  if (filledItems(doc).length === 0) {
+    return {
+      ok: false,
+      message: "Add at least one line item before printing.",
+    };
+  }
+  return { ok: true };
+}
+
+export function sampleDocument(): QuoteDocument {
+  return normalizeDocument({
+    id: "sample",
+    type: "estimate",
+    number: "IQ-2026-018",
+    date: todayISO(),
+    dueDate: addDaysISO(todayISO(), 14),
+    currency: "GBP",
+    look: "classic",
+    business: {
+      name: "Hayes & Son Plumbing",
+      email: "jobs@hayesandson.co.uk",
+      phone: "0121 555 0148",
+      website: "hayesandson.co.uk",
+      tagline: "Reliable plumbing across Birmingham",
+      logoDataUrl: "",
+    },
+    client: {
+      name: "Mrs A. Patel",
+      email: "a.patel@mail.com",
+      address: "42 Kings Heath Road\nBirmingham B14 7AA",
+    },
+    items: [
+      {
+        id: "sample-1",
+        description: "Supply and fit new bathroom suite",
+        qty: 1,
+        unitPrice: 780,
+      },
+      {
+        id: "sample-2",
+        description: "Wall and floor tiling",
+        qty: 1,
+        unitPrice: 420,
+      },
+      {
+        id: "sample-3",
+        description: "First and second fix plumbing",
+        qty: 1,
+        unitPrice: 390,
+      },
+      {
+        id: "sample-4",
+        description: "Waste, making good and clean down",
+        qty: 1,
+        unitPrice: 260,
+      },
+    ],
+    notes:
+      "Please pay by bank transfer. Use the invoice number as your payment reference.",
+    payment: {
+      preset: "bank",
+      paypal: "",
+      venmo: "",
+      bankName: "Hayes & Son Plumbing",
+      bankDetails: "",
+      sortCode: "20-77-89",
+      accountNumber: "40192837",
+      paymentLink: "",
+    },
+  });
+}
+
+export function toPlainText(doc: QuoteDocument): string {
+  const totals = computeTotals(doc);
+  const money = (n: number) => formatMoney(n, doc.currency);
+  const kind = doc.type === "invoice" ? "INVOICE" : "ESTIMATE";
+  const b = doc.business;
+  const c = doc.client;
+  const lines: string[] = [
+    `${kind} ${doc.number}`.trim(),
+    b.name,
+    b.tagline,
+    [b.email, b.phone, b.website].filter(Boolean).join(" · "),
+    "",
+    `Date: ${formatDisplayDate(doc.date)}`,
+    doc.dueDate ? `Due: ${formatDisplayDate(doc.dueDate)}` : "",
+    doc.validUntil ? `Valid until: ${formatDisplayDate(doc.validUntil)}` : "",
+    doc.poNumber.trim() ? `PO: ${doc.poNumber.trim()}` : "",
+    `Currency: ${doc.currency}`,
+    "",
+    "Bill to",
+    c.name,
+    c.address,
+    c.email,
+    "",
+    "Items",
+  ].filter((line, i, arr) => line !== "" || arr[i - 1] !== "");
+
+  for (const item of filledItems(doc)) {
+    const amount = roundMoney((Number(item.qty) || 0) * (Number(item.unitPrice) || 0));
+    lines.push(
+      `${item.description} — ${item.qty} × ${money(item.unitPrice)} = ${money(amount)}`,
+    );
+  }
+
+  lines.push("");
+  lines.push(`Subtotal: ${money(totals.subtotal)}`);
+  if (totals.discount > 0) {
+    const label =
+      doc.discountType === "percent"
+        ? `Discount (${doc.discountValue}%)`
+        : "Discount";
+    lines.push(`${label}: −${money(totals.discount)}`);
+  }
+  if (totals.tax > 0) {
+    lines.push(`VAT (${doc.taxPercent}%): ${money(totals.tax)}`);
+  }
+  lines.push(`Total: ${money(totals.total)}`);
+  if (totals.deposit > 0) {
+    lines.push(`Deposit paid: −${money(totals.deposit)}`);
+    lines.push(`Balance due: ${money(totals.balance)}`);
+  }
+  const p = doc.payment;
+  if (paymentHasAny(p)) {
+    lines.push("", "Pay");
+    if (p.preset === "bank") lines.push("Bank transfer");
+    if (p.preset === "paypal") lines.push("PayPal");
+    if (p.preset === "stripe") lines.push("Stripe");
+    if (p.preset === "cash") lines.push("Cash on completion");
+    if (p.paypal.trim()) lines.push(`PayPal: ${p.paypal.trim()}`);
+    if (p.sortCode.trim()) lines.push(`Sort code: ${p.sortCode.trim()}`);
+    if (p.accountNumber.trim()) lines.push(`Account number: ${p.accountNumber.trim()}`);
+    if (p.bankName.trim() || p.bankDetails.trim()) {
+      lines.push([p.bankName, p.bankDetails].filter(Boolean).join(" — "));
+    }
+    if (p.paymentLink.trim()) lines.push(p.paymentLink.trim());
+  }
+  if (doc.notes.trim()) {
+    lines.push("", "Notes", doc.notes.trim());
+  }
+  lines.push("", "Thank you for your business.");
+  return lines.filter((line, i, arr) => !(line === "" && arr[i - 1] === "")).join("\n");
+}
+
+export async function fileToLogoDataUrl(file: File): Promise<string> {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = await loadImage(objectUrl);
+    const max = 360;
+    const scale = Math.min(1, max / Math.max(img.width, img.height));
+    const width = Math.max(1, Math.round(img.width * scale));
+    const height = Math.max(1, Math.round(img.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Could not read this image.");
+    ctx.drawImage(img, 0, 0, width, height);
+    return canvas.toDataURL("image/png");
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Could not read this image."));
+    img.src = src;
+  });
+}

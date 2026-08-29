@@ -1,0 +1,245 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Cormorant Garamond", "Palatino Linotype", Palatino, Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --color-navy: #141416;
+  --color-gold: #a8abb3;
+  --color-gold-deep: #8a8e96;
+  --color-paper: #f6f4ef;
+  --color-paper-edge: #e7e3db;
+
+  --color-bg: #efece6;
+  --color-bg-elevated: #faf9f6;
+  --color-fg: #141416;
+  --color-fg-muted: #5c5e64;
+  --color-fg-subtle: #8b8d93;
+  --color-border: #ddd9d1;
+  --color-border-strong: #c9c5bd;
+  --color-accent: #a8abb3;
+  --color-accent-fg: #141416;
+  --color-primary: #141416;
+  --color-primary-fg: #f6f4ef;
+  --color-ring: #a8abb3;
+  --color-danger: #9b3a32;
+  --color-danger-fg: #fff8f6;
+
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 32px;
+
+  --shadow-border:
+    0px 0px 0px 1px rgb(15 23 42 / 0.06),
+    0px 1px 2px -1px rgb(15 23 42 / 0.06),
+    0px 2px 4px 0px rgb(15 23 42 / 0.04);
+  --shadow-border-hover:
+    0px 0px 0px 1px rgb(15 23 42 / 0.08),
+    0px 1px 2px -1px rgb(15 23 42 / 0.08),
+    0px 2px 4px 0px rgb(15 23 42 / 0.06);
+  --shadow-paper:
+    0 1px 1px rgb(15 23 42 / 0.04),
+    0 12px 24px -12px rgb(15 23 42 / 0.16),
+    0 32px 64px -24px rgb(15 23 42 / 0.18);
+  --shadow-lift:
+    0 10px 30px -18px rgb(15 23 42 / 0.22);
+
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+html.dark {
+  --color-bg: #0b0b0c;
+  --color-bg-elevated: #141416;
+  --color-fg: #f3f1ec;
+  --color-fg-muted: #b0b2b8;
+  --color-fg-subtle: #7c7e84;
+  --color-border: #2a2a2e;
+  --color-border-strong: #3a3a40;
+  --color-primary: #f3f1ec;
+  --color-primary-fg: #141416;
+  --color-danger: #e07a72;
+  --color-danger-fg: #1a0d0c;
+  --shadow-border: 0 0 0 1px rgb(255 255 255 / 0.08);
+  --shadow-border-hover: 0 0 0 1px rgb(255 255 255 / 0.13);
+  --shadow-paper:
+    0 1px 1px rgb(0 0 0 / 0.4),
+    0 24px 48px -16px rgb(0 0 0 / 0.55);
+  --shadow-lift: 0 16px 40px -20px rgb(0 0 0 / 0.7);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    background-color: var(--color-bg);
+    color: var(--color-fg);
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
+  body {
+    min-height: 100dvh;
+    max-width: 100%;
+    background-color: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    overflow-x: hidden;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  input,
+  textarea,
+  select {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  input[type="date"],
+  input[type="number"] {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-gold) 35%, transparent);
+    color: var(--color-navy);
+  }
+}
+
+@utility font-display {
+  font-family: var(--font-display);
+}
+
+/* Staggered landing enter */
+.stagger-item {
+  animation: rise-in 500ms var(--ease-smooth-out) both;
+}
+.stagger-item:nth-child(1) {
+  animation-delay: 40ms;
+}
+.stagger-item:nth-child(2) {
+  animation-delay: 100ms;
+}
+.stagger-item:nth-child(3) {
+  animation-delay: 160ms;
+}
+.stagger-item:nth-child(4) {
+  animation-delay: 220ms;
+}
+.stagger-item:nth-child(5) {
+  animation-delay: 280ms;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stagger-item,
+  .stagger-item:nth-child(n) {
+    animation: none;
+  }
+}
+
+/* Invoice paper */
+.invoice-paper {
+  background-color: var(--color-paper);
+  color: var(--color-navy);
+  box-shadow: var(--shadow-paper);
+}
+
+/* Print: one A4 page, chrome gone */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  html,
+  body {
+    background: white !important;
+    color: #141416 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .no-print,
+  header,
+  nav,
+  aside,
+  [data-sonner-toaster],
+  iframe[src*="grok.com"] {
+    display: none !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .print-root,
+  .print-root * {
+    visibility: visible;
+  }
+
+  .print-only,
+  .print-root {
+    display: block !important;
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+
+  .invoice-paper {
+    box-shadow: none !important;
+    transform: none !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  article {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}
+
+.print-only {
+  display: none;
+}
